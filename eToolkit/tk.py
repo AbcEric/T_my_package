@@ -12,6 +12,8 @@ License:    ABC
 
 History:    1. 2020-07-09: Add Log class first;
             2. Add Device class;
+            3. 2020-07-29：Send eMail class：
+
 """
 
 import logging
@@ -21,6 +23,9 @@ import time
 import psutil
 import platform
 import os
+import smtplib              # 用于邮件发送
+from email.mime.text import MIMEText
+from email.header import Header
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "[%Y-%m-%d %H:%M:%S]"
@@ -31,7 +36,50 @@ INFO = 20
 ERROR = 40
 
 
-# 个人的日志记录
+# 采用QQ邮箱进行邮件发送
+# QQ邮箱默认关闭SMTP服务，需要登录邮箱开启，并生成授权码: 用绑定手机发送短信“配置邮件客户端”到1069070069
+class Mail:
+    # 发信方的信息：发信邮箱，QQ邮箱授权码, 收信邮箱，邮件服务器
+    def __init__(self, from_addr, passwd, to_addr, smtp_server='smtp.qq.com'):
+        self.from_addr = from_addr
+        self.to_addr = to_addr
+
+        # 开启发信服务，这里使用的是加密传输
+        try:
+            self.server = smtplib.SMTP_SSL(smtp_server)
+            self.server.connect(smtp_server, 465)
+
+            # 登录发信邮箱
+            self.server.login(from_addr, passwd)
+        except Exception as e:
+            print("登录邮箱失败[{0}:{1}:{2}]：{3}".format(from_addr, passwd, smtp_server, str(e)))
+            self.server = None
+
+        return
+
+    def sendmail(self, subject, text, msg_format='plain', msg_coding='utf-8', close=False):
+        if self.server is None:
+            print("请先登录你的邮箱 ...")
+            return
+
+        # 邮箱正文内容，第一个参数为内容，第二个参数为格式(plain 为纯文本)，第三个参数为编码
+        msg = MIMEText(text, msg_format, msg_coding)
+
+        # 邮件头信息
+        msg['From'] = Header(self.from_addr)
+        msg['To'] = Header(self.to_addr)
+        msg['Subject'] = Header(subject)
+
+        # 发送邮件
+        self.server.sendmail(self.from_addr, self.to_addr, msg.as_string())
+
+        # 关闭服务器
+        if close:
+            self.server.quit()
+        return
+
+
+# 个人的日志记录：
 class Log:
     # osd: 控制是否同步在桌面终端显示，缺省不显示, 用于调试！
     # 若在debug中增加osd=参数，由于print没有采用args和kwargs方式，只能采用"xxx{0}{1}.format(x1, x2)"的方式传参
@@ -128,6 +176,12 @@ class Device:
 
 
 if __name__ == '__main__':
+    '''
+    qqmail = Mail("xxx@qq.com", "ifseaywpkzlkbcfi", "lihuachun@abchina.com")
+    # 不加close可连续发送：
+    qqmail.sendmail("You are welcome!", "Hi, this is a email send by QQ. 用于自动发送的测试", close=True)
+    '''
+
     dev = Device()
     print(dev.get_mac(), dev.get_hostname())
     print(dev.get_date(), dev.get_time())
